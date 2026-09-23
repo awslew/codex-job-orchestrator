@@ -16,7 +16,7 @@
 **约定：**
 
 - `<CODEX_HOME>` = 你的 Codex 配置目录，通常是 `~/.codex`。
-- `<ORCHESTRATOR_HOME>` = 本仓库的绝对路径（例如 `D:\codex-agent-chain`）。
+- `<ORCHESTRATOR_HOME>` = 本仓库的绝对路径（例如 `D:\codex-job-orchestrator`）。
 - 命令示例给的是 Windows（`pwsh` / `cmd`）；POSIX 等价命令会在旁边注明。
 - 三档是**累进**的：档 2 包含档 1，档 3 包含档 2。**按顺序装，不要跳。**
 
