@@ -266,7 +266,7 @@ function walkFiles(dir: string): string[] {
   return out;
 }
 
-const PKG_NAME = 'claude-code-orchestrator';
+const PKG_NAME = 'codex-job-orchestrator';
 // Version must be a short, safe token (semver-ish: alphanumeric + `. - +`),
 // never a secret or a long path-like string.
 const SAFE_VERSION_RE = /^[0-9A-Za-z][0-9A-Za-z.\-+]{0,31}$/;

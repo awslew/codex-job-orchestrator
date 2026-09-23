@@ -1,6 +1,6 @@
 # 第三方组件与许可声明 / Third-Party Notices
 
-本文件说明 `codex-agent-chain`（npm 包名 `claude-code-orchestrator`）所涉及的所有第三方组件：
+本文件说明 `codex-job-orchestrator`（仓库名与 npm 包名同名）所涉及的所有第三方组件：
 哪些随本仓库分发、各自是什么许可、以及你在再分发本仓库时需要履行的义务。
 
 - 本仓库**自身代码**以 **MIT** 许可发布，全文见根目录 [`LICENSE`](./LICENSE)。

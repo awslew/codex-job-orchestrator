@@ -129,7 +129,7 @@ function resolveInternalAgentParallelism(params: { parallelism?: unknown; intern
 }
 
 const server = new McpServer({
-  name: 'claude-code-orchestrator',
+  name: 'codex-job-orchestrator',
   version: SERVER_VERSION,
 });
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * tools/init.mjs — claude-code-orchestrator 环境探测 + 配置生成器
+ * tools/init.mjs — codex-job-orchestrator 环境探测 + 配置生成器
  * =============================================================================
  * 目标：把原来 9~12 步的手工改配置压成「一条命令 + 贴一段配置」。
  *
@@ -804,7 +804,7 @@ function buildTomlSnippet(cfg, probes) {
   const node = probes.node.execPath;
 
   L.push('# ============================================================================');
-  L.push('# claude-code-orchestrator — MCP server 配置片段');
+  L.push('# codex-job-orchestrator — MCP server 配置片段');
   L.push(`# 由 tools/init.mjs 生成于 ${new Date().toISOString()}`);
   L.push('# 用法：把本文件内容整体追加到 ~/.codex/config.toml 末尾（或合并进已有的同名段），');
   L.push('#      然后重启 Codex / 重载 MCP。脚本不会替你改任何现有配置。');
@@ -1192,7 +1192,7 @@ function writeGenerated(cfg, probes) {
 // -----------------------------------------------------------------------------
 
 function printHelp() {
-  out(`${C.bold('tools/init.mjs')} — claude-code-orchestrator 环境探测 + 配置生成器`);
+  out(`${C.bold('tools/init.mjs')} — codex-job-orchestrator 环境探测 + 配置生成器`);
   out('');
   out('用法：');
   out('  node tools/init.mjs           交互式（无 TTY 时全部取默认值，不会卡住）');
@@ -1212,7 +1212,7 @@ async function main() {
   }
 
   out('');
-  out(C.bold(C.green('claude-code-orchestrator · 环境探测与配置生成器')));
+  out(C.bold(C.green('codex-job-orchestrator · 环境探测与配置生成器')));
   out(C.gray(`仓库根目录：${REPO_ROOT}`));
 
   const probes = runProbes();

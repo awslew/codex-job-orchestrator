@@ -6,7 +6,7 @@
 
 Report it privately through GitHub Security Advisories on this repository:
 
-> https://github.com/awslew/codex-agent-chain/security/advisories/new
+> https://github.com/awslew/codex-job-orchestrator/security/advisories/new
 
 If you cannot use that channel, at most open a public issue that says **only** "I have a security
 report and need a private channel" — with no details, no reproducer and no affected-path hints.
@@ -43,7 +43,7 @@ orchestrator act on input the user did not direct it to act on.
 
 **不要用公开 issue 报告安全问题。** 请走本仓库的 GitHub Security Advisories 私下报告：
 
-> https://github.com/awslew/codex-agent-chain/security/advisories/new
+> https://github.com/awslew/codex-job-orchestrator/security/advisories/new
 
 若无法使用该渠道，最多只能开一个**不含任何细节**的 issue，说明"我有安全报告需要私下联系"。本项目是
 无赏金的志愿项目，我们会在 7 天内回应。

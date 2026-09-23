@@ -1,6 +1,6 @@
 <div align="center">
 
-# claude-code-orchestrator
+# codex-job-orchestrator
 
 **A local async MCP job orchestrator. Turn "one 10-second MCP call" into "a job that runs for three hours in the background."**
 
@@ -76,7 +76,7 @@ Practical habits:
 
 ### What this is
 
-`claude-code-orchestrator` is a **local, asynchronous, MCP-native scheduler**. Your Codex main
+`codex-job-orchestrator` is a **local, asynchronous, MCP-native scheduler**. Your Codex main
 session acts as the *leader* and dispatches long-running work to *workers*. Instead of blocking a
 single tool call for 30–180 minutes, `claude_code_start` returns a `jobId` in under 10 seconds, the
 work continues in a detached process, and you wait **event-driven** with `claude_code_watch` — one
@@ -797,7 +797,7 @@ launches the CLIs you installed yourself, under their own licenses and terms.
 
 ### 这是什么
 
-`claude-code-orchestrator` 是一个**本地异步 MCP 调度器**。Codex 主会话当**领导**，把长任务派给
+`codex-job-orchestrator` 是一个**本地异步 MCP 调度器**。Codex 主会话当**领导**，把长任务派给
 **worker**；`claude_code_start` 在 10 秒内返回 `jobId`，任务在独立进程里跑 30–180 分钟，等待走
 **事件驱动**的 `claude_code_watch`——一次 MCP 调用挂起，直到任务真的进入终态或需要审批才返回。
 任务运行期间，这次调用消耗 **0 个模型回合**。

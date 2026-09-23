@@ -1,11 +1,11 @@
 {
-  "name": "claude-code-orchestrator",
+  "name": "codex-job-orchestrator",
   "version": "1.0.0",
   "license": "MIT",
   "author": "awslew",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/awslew/codex-agent-chain.git"
+    "url": "git+https://github.com/awslew/codex-job-orchestrator.git"
   },
   "type": "module",
   "description": "Local async MCP orchestrator: dispatch long-running coding jobs from Codex to Claude Code, Codex-native subagents, or DeepSeek Harness workers (start/status/wait/watch/reply/cancel/list/health).",
