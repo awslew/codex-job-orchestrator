@@ -1,0 +1,112 @@
+# codex-job-orchestrator
+
+> 本地、异步、MCP 原生的编码任务编排器（TypeScript / Node ≥ 20）：把「一次 10 秒的 MCP 调用」变成「一个在后台跑三小时、可查询、可续跑、可取消的 job」。Codex 主会话当 LEADER 负责规划与验收，实现工作派给 worker；`claude_code_start` 在 10 秒内返回 `jobId`，`claude_code_watch` 事件驱动等待，任务运行期间**零模型 turn**。
+
+## 项目定位
+
+- **给谁用**：在 Codex（或任何支持 stdio MCP server 的宿主）里跑长任务的开发者——编译、重构、批量测试、跨文件改造这类 30–180 分钟的工作。
+- **解决什么问题**：MCP 工具调用是同步请求/响应，宿主超时就会杀掉调用；把 90 分钟构建日志灌进主会话上下文会永久占用每一轮 token；轮询等待每次都是一次真实模型 turn；客户端断开/宿主重启不该丢任务。它用「独立 supervisor 进程 + 磁盘上的 job JSON 作为唯一真相 + 跨进程事件代理唤醒 waiter」解决这四件事。
+- **不是什么**：不是托管服务、不是代理、不是模型路由；不安装 `claude`、不读你的凭据；不替代 Codex 原生子代理（那是 Tier 1）；**默认 `auto` profile 不做沙箱**。
+
+## 快速开始
+
+```bash
+# 1. 取代码并安装/构建
+npm install
+npm run build
+
+# 2. 只读环境探测，把建议配置写进 ./generated/（绝不改你已有的文件）
+node tools/init.mjs
+
+# 3. 把 generated/codex-config.snippet.toml 合并进 <CODEX_HOME>/config.toml
+#    （<CODEX_HOME> 通常是 ~/.codex），然后重启 Codex 让 MCP 工具被发现
+```
+
+MCP 配置的两个硬约束（漏掉就是「工具不存在」或「watch 被腰斩」）：
+
+```toml
+[mcp_servers.claude_orchestrator]
+enabled = true              # 少了这行 Codex 不报错，但 claude_code_* 工具全部不存在
+startup_timeout_sec = 120
+tool_timeout_sec = 14400    # 必须 ≥ 14400（4 h）；watch 单次调用最长挂起 4 小时
+```
+
+不花模型额度的自验证（测试跑 `test/fake-claude.mjs` 这个假 CLI）：
+
+```bash
+npm test                          # build + build:test + node --test（全量 node:test 套件）
+npm run test:unit                 # 只跑 unit 层
+npm run test:integration:serial    # 串行 integration 层
+npm run test:windows              # Windows 进程身份层
+npm run test:gate                 # unit → integration → windows → smoke 顺序闸门
+npm run test:smoke:gate           # 离线 smoke 闸门
+npm run test:smoke:offline-all    # 离线 smoke 扩展集
+```
+
+人工观察某个 job 的实时输出：
+
+```bash
+node dist/viewer.js <jobId>
+```
+
+## 三层架构
+
+| 层 | 角色 | 说明 |
+|---|---|---|
+| Tier 1 LEADER | 你的 Codex 主会话 | 规划、架构、取舍、优先级、验收标准；持有最终 accept/reject 决定 |
+| Tier 2 WORKERS | 三条路由，按 backend 选，**绝不按模型名选** | `claude`（Claude Code CLI，默认）/ `luna_worker`（Codex 原生子代理，**不走本编排器**）/ `deepseek-harness`（本地 headless runner） |
+| Tier 3 PERSISTENCE & EVENTS | 共享、与 backend 无关 | `runtime/jobs/<jobId>.json`（原子写、唯一真相）、`runtime/logs/`、`runtime/settings/`、`runtime/claims/`（CAS 单写者锁）、`runtime/registry/instances/`（实例心跳）、`JobEventBroker`（对 jobs 目录的 `fs.watch`） |
+
+## 核心能力：9 个 MCP 工具
+
+工具名统一以 `claude_code_` 开头：
+
+| 工具 | 作用 |
+|---|---|
+| `claude_code_start` | 派发一个 detached 后台 job；10 秒内返回 `jobId` + `sessionId` + 实际路由 + `warnings[]` |
+| `claude_code_status` | 紧凑状态 + 可读的渲染尾部 + `idleSeconds`（停滞检测信号）；`raw:true` 看原始日志尾部 |
+| `claude_code_wait` | **兜底**：long-poll，默认/最大 240 秒，单次调用不超过 300 秒边界 |
+| `claude_code_watch` | **默认等待方式**：事件驱动，默认/最大 14400 秒；running 时永不返回 `running`，因此零模型 turn |
+| `claude_code_reply` | 续跑：claude 后端 `--resume <sessionId>` 真续会话；harness 后端默认拒绝（`fresh_turn_authorization_required`） |
+| `claude_code_cancel` | 只终止目标 job 的进程树；日志与报告保留可审计 |
+| `claude_code_list` | 最近 job 的紧凑元数据（MCP/宿主重启后的恢复入口） |
+| `claude_code_health` | 只读健康检查：版本、loaded/disk 构建指纹、实例身份、本进程**真实注册**的能力、`reloadRequired`、`diagnostic` |
+| `claude_code_retention_preview` | 只读留存 dry-run；**故意没有 apply/delete 工具** |
+
+## 关键约束与已知取舍（如实）
+
+- **平台**：仅 Windows 经过验证。POSIX 分支存在且有测试覆盖，但**端到端没人跑过 macOS / Linux**，按「未测试」而非「支持」对待。
+- **默认 `auto` profile 没有沙箱**：worker 用 `--permission-mode bypassPermissions` 启动，以你的 OS 用户身份运行，无人值守。真正约束它的只有三样：生效的 `deny` 列表、`workFolder`、以及你给 worker 的 prompt。
+- **`deny` 是前缀黑名单，不是沙箱**：字面前缀匹配，换个写法、走脚本、经 `npx` 中转都拦不住；它降低爆炸半径，不构成强制边界。但内置默认 `deny`（`DEFAULT_WORKER_DENY`）是**下界**：与你的白名单取并集，配置只能收紧、**永远不能调低**。
+- **不要把不可信内容喂给 leader 会话**：能派发 job 的主会话，其指令就可能被它刚读到的东西注入。
+- **不要用 `claude_code_reply` 续 `luna_worker`**：原生子代理不是本编排器的 backend，续跑用 `followup_task`。
+- **deepseek-harness 后端是一次性协议**：`supportsAttention=false`、`supportsLiveEvents=false`、`supportsSessionResume=false`；给它 reply 默认被拒，`allowFreshTurn=true` 跑的是**全新的独立 turn**，不是续跑。
+- **`watch` 断开不等于取消**：客户端 abort/断开只清掉 watcher，不改 job 状态；之后可对同一 `jobId` 重新 `watch`。
+- **重构过的事实**：`auto` profile 的模型分类器**已被移除**（每调用多一次模型请求、反复超时、烧额度），改为确定性的 `deny` 前缀列表。
+- **`ORCHESTRATOR_RETENTION_V2` / `ORCHESTRATOR_ADMISSION_CONTROL` / `ORCHESTRATOR_METRICS_V2` / `ORCHESTRATOR_CONTRACT_V2` / `ORCHESTRATOR_BUDGET_ENFORCEMENT` 默认全关**。
+- **live smoke 不会自己跑**：`test:smoke:all` 里的 live 分类只在 `ORCHESTRATOR_ALLOW_LIVE_SMOKE=1` 时执行。
+- **`runtime/` 里可能有 prompt 的本地副本**：删之前想清楚是否还需要。
+
+## 文档索引
+
+- [README.md](./README.md) —— 主文档，中英双语（安全边界 / 三层架构 / 工具契约 / 配置参考）
+- [docs/SETUP.md](./docs/SETUP.md) —— 三档安装步骤、期望输出与回滚
+- [docs/BACKENDS.md](./docs/BACKENDS.md) —— worker backend 能力矩阵与路由决策树
+- [docs/METHODOLOGY.md](./docs/METHODOLOGY.md) —— 为什么这样设计三层纪律，以及什么时候它是净损失（含作者的反对意见）
+- [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md) —— 症状 → 原因 → 修法，含两个最费时间的坑
+- [SECURITY.md](./SECURITY.md) —— 威胁模型与漏洞上报
+- [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) —— 第三方组件、许可与再分发义务（Claude Code CLI 是专有软件）
+- [config/README.md](./config/README.md) —— worker 侧 MCP 配置目录说明
+- [templates/AGENTS.strict-delegation.md](./templates/AGENTS.strict-delegation.md) —— 可直接粘贴进全局指令的强制委派规则模板
+- [templates/worker-whitelist.README.md](./templates/worker-whitelist.README.md) —— worker 权限白名单怎么装、`warnings[]` 怎么读
+- [AGENTS.md](./AGENTS.md) —— 在此仓库开发时的约定（面向 coding agent）
+
+## Optional
+
+- [config/hermetic-mcp.example.json](./config/hermetic-mcp.example.json) —— 空 MCP 面示例，配 `--strict-mcp-config` 防止 worker 递归调用编排器
+- [templates/codex-config.snippet.toml](./templates/codex-config.snippet.toml) —— Codex MCP 配置片段模板
+- [templates/luna_worker.toml](./templates/luna_worker.toml) —— Tier 1 原生子代理定义模板
+- [templates/worker-whitelist.json](./templates/worker-whitelist.json) —— 白名单起点（**不是完整策略**，会被内置基线并集补全）
+- [tools/init.mjs](./tools/init.mjs) —— 只读环境探测 + 配置生成
+- [smoke/](./smoke) —— 离线与 live 的 smoke 脚本目录
+- [LICENSE](./LICENSE) —— MIT
