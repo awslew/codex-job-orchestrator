@@ -1,0 +1,134 @@
+# ============================================================================
+# codex-agent-chain —— Codex 侧 MCP 配置片段（模板）
+#
+# 用法：把本文件内容整体追加到 ~/.codex/config.toml 末尾（或合并进已有的同名段），
+#      把下面所有 <...> 占位符替换成你自己的值，然后重启 Codex / 重载 MCP。
+#      本文件只是模板，不做任何自动化 —— 它不会替你改动任何现有配置。
+#
+# 涉及两个东西：
+#   1) [mcp_servers.claude_orchestrator] —— 本调度器作为 MCP server 暴露给 Codex
+#   2) [agents] —— Codex 原生子代理（Luna 档）的全局开关，不用 Luna 档就整段别粘
+# ============================================================================
+
+[mcp_servers.claude_orchestrator]
+# ★ 头号坑：enabled 必须显式为 true。
+#   如果这里是 false（或从别处继承/覆盖成了 false），Codex 不会报任何错，
+#   而是让 claude_code_* 这一整套工具「根本不存在」——工具列表里找不到、调用报
+#   未知工具。排查很久找不到原因，通常就是这个开关。
+enabled = true
+
+# node 可执行文件的绝对路径。
+#   Windows 形如 <...>\node.exe；macOS/Linux 形如 /usr/local/bin/node。
+#   也可以直接写 "node"，前提是 Codex 启动时的 PATH 里能找到它。
+command = '<ABSOLUTE_PATH_TO_NODE_EXE>'
+
+# MCP server 入口。<ORCHESTRATOR_HOME> = 本仓库克隆后的绝对路径。
+args = ['<ORCHESTRATOR_HOME>/dist/index.js']
+# 提示：构建完成后若 <ORCHESTRATOR_HOME>/dist/orchestrator-launcher.cjs 存在，优先用它
+#       （它按会话隔离 runtime/ 目录，多会话并行时避免实例互相干扰）。用法：
+# args = ['<ORCHESTRATOR_HOME>/dist/orchestrator-launcher.cjs']
+
+# 启动超时（秒）：首次启动要加载 MCP SDK 并恢复历史 job，给足 120 秒，避免 Codex
+#   过早判定 server 启动失败。
+startup_timeout_sec = 120
+
+# 工具超时（秒）：必须是 14400（= 4 小时）。
+#   claude_code_watch 单次挂起的上限就是 4 小时（覆盖 worker 最长 180 分钟的运行时
+#   上限 + 收尾时间）。宿主侧超时如果小于这个值，会在 watch 还没返回时把它掐断 ——
+#   长任务「莫名失败」多半是这里配小了。
+tool_timeout_sec = 14400
+
+# ---------------------------------------------------------------------------
+# 环境变量段：下面每一项都刻意注释掉了。
+#   只用「你确实要提供值」的变量。写空串会覆盖 CLI 自己的默认值，等于把用户的
+#   官方登录态顶掉 —— 这是安装期第二大坑。未列出的变量一律走内置默认。
+# ---------------------------------------------------------------------------
+[mcp_servers.claude_orchestrator.env]
+
+# Claude worker 的 Anthropic 端点。
+#   留空（=整行不要写）= 不注入任何端点，worker 直接用 Claude CLI 自己已配置好的
+#   登录态 / key —— 绝大多数人就用这一档，不要设这个变量。
+#   仅当你需要走「本机代理」时，才把它设成字符串 'local'：此时注入
+#   http://127.0.0.1:<port> 加占位 token（端口由调度器内部常量决定）。
+# ORCHESTRATOR_ANTHROPIC_BASE_URL = 'local'
+
+# 上面那种自建网关 / 本机代理场景下的 auth token。未设置则不注入。
+#   官方登录态场景请勿设置它。
+# ORCHESTRATOR_ANTHROPIC_AUTH_TOKEN = '<YOUR_TOKEN>'
+
+# 模型覆盖：未设置 = 不注入，Claude CLI 用自己的默认模型。
+#   <KIND> 取 HAIKU / SONNET / OPUS；带 _NAME 后缀的是 provider 侧别名（可选）。
+#   只有当你明确知道目标模型 id 时才设置 —— 设成不存在的 id 会让每个 Claude worker
+#   立刻失败。
+# ORCHESTRATOR_MODEL_HAIKU = '<MODEL_ID>'
+# ORCHESTRATOR_MODEL_SONNET = '<MODEL_ID>'
+# ORCHESTRATOR_MODEL_OPUS = '<MODEL_ID>'
+# ORCHESTRATOR_MODEL_SONNET_NAME = '<PROVIDER_SIDE_ALIAS>'
+
+# worker 权限白名单文件路径。
+#   未设置时调度器按默认位置找 ~/.claude/worker-whitelist.json（模板见
+#   templates/worker-whitelist.json）。权限解析规则：allow 按你写的原样使用（绝不放大）；
+#   deny 是**内置基线 ∪ 你文件里的规则**——基线只能加、不能减，写配置只能收紧策略。
+#   文件缺失时 allow 回退到保守的内置清单、deny 用完整内置清单（deny 永不为空）；发生了
+#   替换或补齐都会通过 start/reply 响应的 warnings[]、job 的 .stderr.log 和
+#   claude_code_health 的 notes 报告。比基线窄的模板（如随仓库发的）会被自动补齐，
+#   提示形如 "worker whitelist incomplete … Nothing is broken"，属正常语义、不是故障。
+# ORCHESTRATOR_WHITELIST_PATH = '<ABSOLUTE_PATH_TO_WORKER_WHITELIST_JSON>'
+
+# 可选的 read-guard hook 脚本路径。
+#   只有该文件真实存在时才会被注入（不存在则自动跳过，不会产生失败的 hook）。
+#   需要显式关闭时把它设成 'off'。
+# ORCHESTRATOR_READ_GUARD_HOOK = '<ABSOLUTE_PATH_TO_READ_GUARD_HOOK>'
+# ORCHESTRATOR_READ_GUARD_HOOK = 'off'
+
+# 要拉起的 claude CLI 可执行文件。未设置时用 PATH 里的 'claude'。
+#   ⚠️ 必须是**原生 .exe**（或 .js 入口 + 下面 CLAUDE_CLI_PREFIX 指向 node.exe）。
+#   Windows 上 npm 全局安装的 claude.cmd / claude.ps1 **不能**直接写进这里：调度器用
+#   shell:false 启动 worker，Node ≥20.12 对 .cmd 直接报 EINVAL。npm 包内已带原生
+#   ...\@anthropic-ai\claude-code\bin\claude.exe，请指向它。
+#   ⛔ 永远不要为了绕开这一点而启用 shell:true —— worker 的 prompt 是尾部 argv，
+#   启用 shell 会把 prompt 里的 & | " 变成命令注入。
+# CLAUDE_CLI_NAME = '<ABSOLUTE_PATH_TO_CLAUDE_EXECUTABLE>'
+
+# DeepSeek Harness 后端（可选）：只在你要把 deepseek-harness 当 worker 用时才设置。
+#   ROOT = 它的安装根目录；RUNNER = 具体 runner 入口。
+#   两者都不设时调度器走自动探测。该项目为第三方官方开源项目，需自行安装。
+# DEEPSEEK_HARNESS_ROOT = '<ABSOLUTE_PATH_TO_DEEPSEEK_HARNESS_ROOT>'
+# DEEPSEEK_HARNESS_RUNNER = '<ABSOLUTE_PATH_TO_DEEPSEEK_HARNESS_RUNNER>'
+
+# ----------------------------------------------------------------------------
+# 只读工具免审（approval_mode = "auto"）
+#   这 5 个工具不产生任何副作用，不该每轮都弹审批。
+#   claude_code_start / claude_code_reply / claude_code_cancel 是写操作，刻意不放行。
+# ----------------------------------------------------------------------------
+[mcp_servers.claude_orchestrator.tools.claude_code_status]
+approval_mode = "auto"
+[mcp_servers.claude_orchestrator.tools.claude_code_list]
+approval_mode = "auto"
+[mcp_servers.claude_orchestrator.tools.claude_code_health]
+approval_mode = "auto"
+[mcp_servers.claude_orchestrator.tools.claude_code_watch]
+approval_mode = "auto"
+[mcp_servers.claude_orchestrator.tools.claude_code_wait]
+approval_mode = "auto"
+
+# ============================================================================
+# [agents] —— Codex 原生子代理（Luna 档）全局开关
+#   这一节不属于 MCP。它和本调度器的「档 2：Codex 原生 Luna worker」配套使用：
+#   派发到该档时才需要它，用不到就整段不要粘。
+# ============================================================================
+[agents]
+# 是否启用 Codex 原生子代理。false = 该档不可用。
+enabled = true
+
+# 默认子代理模型 id。占位符请替换为你账号下真实可用的模型。
+#   请填你账号下实际可用的模型 id；可用范围随 Codex 版本与账号而变。
+default_subagent_model = "<LUNA_MODEL_ID>"
+
+# 默认推理强度：占位符请替换为 low / medium / high / xhigh / max 之一
+#   （具体可取范围以你的 Codex 版本为准）。
+default_subagent_reasoning_effort = "<REASONING_EFFORT>"
+
+# 单会话并发子代理线程上限。这里的 4 是建议起点，按机器内存与并发需求调整：
+#   调得过高容易把内存吃干（机器级内存耗尽会直接崩掉 codex 进程），保守更稳。
+max_concurrent_threads_per_session = 4

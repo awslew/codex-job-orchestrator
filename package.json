@@ -1,0 +1,38 @@
+{
+  "name": "claude-code-orchestrator",
+  "version": "1.0.0",
+  "license": "MIT",
+  "author": "awslew",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/awslew/codex-agent-chain.git"
+  },
+  "type": "module",
+  "description": "Local async MCP orchestrator: dispatch long-running coding jobs from Codex to Claude Code, Codex-native subagents, or DeepSeek Harness workers (start/status/wait/watch/reply/cancel/list/health).",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-runtime-assets.mjs",
+    "build:test": "tsc -p tsconfig.test.json",
+    "test": "npm run build && npm run build:test && node --test \"dist-test/test/*.test.js\"",
+    "test:unit": "npm run build:test && node scripts/run-test-tier.mjs unit",
+    "test:integration:serial": "npm run build:test && node scripts/run-test-tier.mjs integration",
+    "test:windows": "npm run build:test && node scripts/run-test-tier.mjs windows",
+    "test:smoke:all": "node scripts/run-smoke-suite.mjs --mode=all",
+    "test:smoke:gate": "node scripts/run-smoke-suite.mjs --mode=gate",
+    "test:smoke:offline-all": "node scripts/run-smoke-suite.mjs --mode=offline-all",
+    "test:gate": "npm run build && npm run build:test && node scripts/run-test-tier.mjs gate",
+    "start": "node dist/index.js",
+    "supervisor": "node dist/supervisor.js",
+    "smoke:watch-long": "node smoke/watch-long-smoke.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "zod": "3.25.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "~5.9.3"
+  }
+}
