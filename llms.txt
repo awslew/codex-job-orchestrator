@@ -1,11 +1,11 @@
 # codex-job-orchestrator
 
-> 本地、异步、MCP 原生的编码任务编排器（TypeScript / Node ≥ 20）：把「一次 10 秒的 MCP 调用」变成「一个在后台跑三小时、可查询、可续跑、可取消的 job」。Codex 主会话当 LEADER 负责规划与验收，实现工作派给 worker；`claude_code_start` 在 10 秒内返回 `jobId`，`claude_code_watch` 事件驱动等待，任务运行期间**零模型 turn**。
+> **想省 Codex 主会话额度和上下文？**把方案与验收留给主 agent，将实现、测试、复杂推理等工作按能力分给不同 agent。三条路径是 Claude Code、Codex 原生子代理、DeepSeek Harness；本仓库的异步 MCP 调度器只直接管理 Claude Code 和 DeepSeek Harness，让它们的长作业在后台运行、断线后仍可查。
 
 ## 项目定位
 
-- **给谁用**：在 Codex（或任何支持 stdio MCP server 的宿主）里跑长任务的开发者——编译、重构、批量测试、跨文件改造这类 30–180 分钟的工作。
-- **解决什么问题**：MCP 工具调用是同步请求/响应，宿主超时就会杀掉调用；把 90 分钟构建日志灌进主会话上下文会永久占用每一轮 token；轮询等待每次都是一次真实模型 turn；客户端断开/宿主重启不该丢任务。它用「独立 supervisor 进程 + 磁盘上的 job JSON 作为唯一真相 + 跨进程事件代理唤醒 waiter」解决这四件事。
+- **给谁用**：想把高价 Codex 额度留给关键判断，把可验证的执行交给合适 agent，又要让长任务无人值守运行的开发者。
+- **解决什么问题**：主会话亲自读大 diff、跑测试和看长日志会耗掉昂贵额度与上下文；MCP 同步调用还会超时。三条路径按工作产出与 backend 能力分工；本调度器为 Claude Code / DeepSeek Harness 作业提供后台执行、事件等待和断线恢复。Codex 原生子代理由 Codex 自己管理。
 - **不是什么**：不是托管服务、不是代理、不是模型路由；不安装 `claude`、不读你的凭据；不替代 Codex 原生子代理（那是 Tier 1）；**默认 `auto` profile 不做沙箱**。
 
 ## 快速开始

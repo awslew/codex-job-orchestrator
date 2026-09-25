@@ -2,7 +2,9 @@
 
 # codex-job-orchestrator
 
-**A local async MCP job orchestrator. Turn "one 10-second MCP call" into "a job that runs for three hours in the background."**
+**把 Codex 主会话的额度留给方案和验收，让合适的 agent 承担实现、测试和长任务。**
+
+Keep your strongest agent's context for decisions; route execution to suitable agents and let long jobs continue beyond MCP timeouts.
 
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 [![MCP](https://img.shields.io/badge/protocol-MCP-blue)](https://modelcontextprotocol.io)
@@ -17,6 +19,10 @@ as untested rather than supported. See [`SECURITY.md`](./SECURITY.md) for the th
 report a vulnerability.
 
 </div>
+
+Codex 主会话读大量源码、跑构建、等 90 分钟任务，会消耗本该用于关键判断的额度和上下文。这里的“三条任务链”按**工作职责和能力**分工：主会话定方案并验收；Codex 原生子代理可处理需要强推理或原生工具的任务；Claude Code 与 DeepSeek Harness 可承担适合它们的有界执行任务。目标是把强推理资源用在真正需要判断的地方，而不是让一个高价会话包办所有步骤。
+
+本仓库提供的 MCP 调度器**直接管理 Claude Code 和 DeepSeek Harness 作业**：快速返回任务编号、后台运行、事件驱动等待和断线恢复。Codex 原生子代理由 Codex 自己管理，**不经过本调度器**。具体路由与成本前提见 [三层任务链方法论](docs/METHODOLOGY.md) 和 [三条路径能力表](docs/BACKENDS.md)。
 
 ---
 
